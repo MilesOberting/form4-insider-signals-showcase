@@ -6,18 +6,22 @@
 flowchart TD
     LMD[Live Market Data]
 
-    subgraph SP[Signal Pipeline]
-        SEC[SEC EDGAR] --> API[Submissions API]
-        API --> XML[XML Parser]
-        XML --> SIG((Signal Emitted))
-    end
-
-    subgraph TP[QuantConnect Trading Platform]
-        ING["Market Data Ingestion &<br/>Portfolio Sizing"]
-        ORD[Emit Live Order]
-        MGT[Order Management]
-        EXIT["Position Exit<br/>(30 days)"]
-        ING --> ORD --> MGT --> EXIT
+    subgraph COLUMNS[" "]
+        direction LR
+        subgraph SP[Signal Pipeline]
+            direction TB
+            SEC[SEC EDGAR] --> API[Submissions API]
+            API --> XML[XML Parser]
+            XML --> SIG((Signal Emitted))
+        end
+        subgraph TP[QuantConnect Trading Platform]
+            direction TB
+            ING["Market Data Ingestion &<br/>Portfolio Sizing"]
+            ORD[Emit Live Order]
+            MGT[Order Management]
+            EXIT["Position Exit<br/>(30 days)"]
+            ING --> ORD --> MGT --> EXIT
+        end
     end
 
     LMD --> SEC
