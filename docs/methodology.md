@@ -6,6 +6,49 @@ years of historical insider-trading data to figure out which signals are
 actually worth following, and to stress-test the live rule before it's
 trusted with real decisions.
 
+## Process overview
+
+```mermaid
+flowchart TD
+    subgraph SRC[" "]
+        D1[Bulk SEC EDGAR<br/>Form 4 Filings]
+        D2[Daily Price History<br/>Yahoo Finance]
+    end
+
+    D1 --> FE[Feature Engineering]
+    D2 --> FE
+
+    FE --> TRAIN["Training Period<br/>(earlier years)"]
+    FE --> HOLD["Held-Out Year<br/>(never trained on)"]
+
+    TRAIN --> MODEL[Model Training]
+    MODEL --> WF["Walk-Forward Backtesting<br/>(expanding window, repeated)"]
+
+    WF --> BT[Backtest Simulation]
+    HOLD --> BT
+    BT --> BEST[Best Strategy Selected]
+    BEST --> LIVE[Deployed to Live Signal Service]
+
+    classDef data fill:#e8f0fe,stroke:#4285f4,color:#1a1a1a;
+    classDef train fill:#fce8e6,stroke:#ea4335,color:#1a1a1a;
+    classDef val fill:#e6f4ea,stroke:#34a853,color:#1a1a1a;
+    classDef out fill:#fef7e0,stroke:#fbbc04,color:#1a1a1a;
+    class D1,D2,FE data;
+    class TRAIN,MODEL,WF train;
+    class HOLD,BT val;
+    class BEST,LIVE out;
+```
+
+The **held-out year** is never seen during training or during the
+walk-forward loop — it exists purely as a final, one-time check on a stretch
+of time the model had no opportunity to learn from. The **walk-forward
+backtesting** loop is the "expanding window" mentioned above: train on an
+initial period, validate on the period right after it, then expand the
+training window to include that period and validate on the next one, and so
+on — a repeated, rolling process rather than a single train/test split. This
+catches a strategy that only works in one specific historical regime, which a
+single split could miss.
+
 ## Data
 
 The research pipeline is built on multi-year SEC EDGAR bulk Form 4 data —

@@ -38,8 +38,11 @@ which asset was bought.
 ![Real trades vs IWM](../assets/real_trades_chart.png)
 
 Both lines use the same method — a dollar-weighted expanding average of
-matched returns, on a common scale (100 = 0% average return so far) — so
-they're directly comparable at every point, not just at the end.
+matched returns — and both start at exactly 100 on the same real date: the
+day before the first trade, where "zero trades, zero return" is true for
+both by definition, not fitted to the data. From there they're the real,
+unsmoothed numbers, so the early section will look noisy (an average of 1-2
+trades swings a lot) — that's genuine small-sample behavior, not an error.
 
 Only percentage returns are published here. No dollar amounts, account
 balances, or individual trade records (tickers, dates, position sizes) are
@@ -56,6 +59,25 @@ buying something already held), and rejection/ban handling when a broker
 declines an order. Most emitted signals don't survive all of that — which is
 exactly why the "raw signal quality" numbers below shouldn't be read as "what
 the account did."
+
+### Why "+3.7% average per trade" looks smaller than the account's actual gain
+
+The account runs two strategies (see [architecture.md](architecture.md)):
+this one, and an unrelated second strategy trading a completely different
+universe of tickers. Comparing realized profit between the two, **this
+strategy accounts for roughly 86% of the account's total realized trading
+profit** over the same period — it's the dominant driver, not a minor
+contributor.
+
+That's not in tension with a modest "+3.7% average per trade" — they're
+different units. The account's capital gets *reused*: the same dollars close
+one 30-day position and open another, over and over, 116 times across 92
+tickers over ~7 months. A modest edge repeated that many times compounds into
+a real cumulative effect on the account far larger than any single trade's
+average return would suggest. "Average return per trade" and "total realized
+contribution to the account" are both honest numbers — they just answer
+different questions, and only the second one is comparable to "the account is
+up X% and most of that is this strategy."
 
 ## Raw signal quality (for context)
 

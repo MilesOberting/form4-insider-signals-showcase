@@ -2,29 +2,23 @@
 
 ## Pipeline
 
-```
-SEC EDGAR full-text search (new Form 4 filings, filed today)
-        │
-        ▼
-SEC EDGAR submissions API (per-insider filing history, paginated)
-        │
-        ▼
-SEC EDGAR raw filing XML (parsed for transaction details)
-        │
-        ▼
-Structural filter — keep only open-market purchases
-        │
-        ▼
-Market-cap / listing-age gate (via public market data)
-        │
-        ▼
-Insider historical win-rate gate
-        │
-        ▼
-Signal emitted
-        │
-        ▼
-Trading system (separate, not part of this repo)
+```mermaid
+flowchart TD
+    A[SEC Form 4 Filings] --> B["EDGAR Full-Text Search<br/>(filed today)"]
+    B --> C["Submissions API<br/>(per-insider filing history, paginated)"]
+    C --> D["Raw Filing XML<br/>(parsed for transaction details)"]
+    D --> E["Structural Filter<br/>(open-market purchases only)"]
+    E --> F["Market-Cap / Listing-Age Gate<br/>(public market data)"]
+    F --> G[Insider Historical Win-Rate Gate]
+    G --> H((Signal Emitted))
+    H --> I["Trading System<br/>(separate, not part of this repo)"]
+
+    classDef data fill:#e8f0fe,stroke:#4285f4,color:#1a1a1a;
+    classDef filt fill:#e6f4ea,stroke:#34a853,color:#1a1a1a;
+    classDef out fill:#fef7e0,stroke:#fbbc04,color:#1a1a1a;
+    class A,B,C,D data;
+    class E,F,G filt;
+    class H,I out;
 ```
 
 Every price, market-cap, and benchmark figure used anywhere in this

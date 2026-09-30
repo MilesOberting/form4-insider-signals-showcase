@@ -172,7 +172,7 @@ def summarize(scored: pd.DataFrame) -> pd.DataFrame:
     return pd.concat([pd.DataFrame([overall]), monthly_summary], ignore_index=True)
 
 
-def build_chart(scored: pd.DataFrame, out_path: str, burn_in: int = 10) -> None:
+def build_chart(scored: pd.DataFrame, out_path: str) -> None:
     """
     Two lines, both built with the EXACT same method - an expanding mean of
     matched 30-day returns, equal-weighted, non-compounding, indexed to
@@ -186,20 +186,24 @@ def build_chart(scored: pd.DataFrame, out_path: str, burn_in: int = 10) -> None:
         buy-and-hold would mix in market-timing luck from choosing when to
         start holding, which isn't what either line is trying to show.
 
-    Both lines are computed from the FULL expanding mean (starting at signal
-    #1) and only SLICED for display at `burn_in`, not independently rebased
-    to 100 at that point - rebasing each line separately would erase the real
-    gap between them at the point the chart starts, which is exactly the
-    thing this chart exists to show. The first `burn_in` signals are still
-    excluded from the plot itself: an average over only 1-2 samples is
-    dominated by whichever trade happened to come first, producing a sharp,
-    meaningless spike/dip. Full-sample stats in summary_stats.csv are
-    unaffected by this - it only trims the chart.
+    Both lines share one true, non-arbitrary starting point: a day-zero
+    anchor (before any signal existed) where both indices are exactly 100 by
+    definition - zero trades means zero return for both, no data needed to
+    justify it. From there, both are the real, unsmoothed expanding mean; an
+    earlier version instead independently rebased each line to 100 at a
+    later, trimmed starting point, which silently erased the real gap
+    between them (the thing this chart exists to show) and is why that
+    version looked backwards relative to the actual win-rate/alpha numbers.
+    The very first several real points will look noisy - an average of 1-2
+    trades swings a lot - and that noise is genuine, not a bug.
     """
     ordered = scored.sort_values("entry_date").reset_index(drop=True)
     ordered["signal_index"] = 100 * (1 + ordered["return_30d"].expanding().mean())
     ordered["iwm_index"] = 100 * (1 + ordered["iwm_return_30d"].expanding().mean())
-    plotted = ordered.iloc[burn_in:]
+
+    anchor_date = ordered["entry_date"].iloc[0] - pd.Timedelta(days=1)
+    anchor = pd.DataFrame({"entry_date": [anchor_date], "signal_index": [100.0], "iwm_index": [100.0]})
+    plotted = pd.concat([anchor, ordered[["entry_date", "signal_index", "iwm_index"]]], ignore_index=True)
 
     fig, ax = plt.subplots(figsize=(9, 5))
     ax.plot(plotted["entry_date"], plotted["signal_index"], label="Live signals (equal-weight, non-compounding)", linewidth=2)

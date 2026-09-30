@@ -10,6 +10,63 @@ live service since launch. It's intentionally general — the specific filter
 thresholds, scoring weights, and model parameters that make the strategy work
 are not included.
 
+### Live signal pipeline
+
+```mermaid
+flowchart TD
+    A[SEC Form 4 Filings] --> B[EDGAR Full-Text Search]
+    B --> C["Submissions API<br/>(insider filing history)"]
+    C --> D[Filing XML Parser]
+    D --> E["Structural Filter<br/>(open-market purchases only)"]
+    E --> F[Market-Cap / Listing-Age Gate]
+    F --> G["Insider Win-Rate Gate<br/>(vs. Russell 2000)"]
+    G --> H((Signal Emitted))
+    H --> I["Trading System<br/>(separate project)"]
+
+    classDef data fill:#e8f0fe,stroke:#4285f4,color:#1a1a1a;
+    classDef filt fill:#e6f4ea,stroke:#34a853,color:#1a1a1a;
+    classDef out fill:#fef7e0,stroke:#fbbc04,color:#1a1a1a;
+    class A,B,C,D data;
+    class E,F,G filt;
+    class H,I out;
+```
+
+See [architecture.md](docs/architecture.md) for what each stage actually does.
+
+### Research & training pipeline
+
+```mermaid
+flowchart TD
+    D1[Bulk SEC EDGAR<br/>Form 4 Filings] --> FE[Feature Engineering]
+    D2[Daily Price History<br/>Yahoo Finance] --> FE
+
+    FE --> TRAIN["Training Period<br/>(earlier years)"]
+    FE --> HOLD["Held-Out Year<br/>(never trained on)"]
+
+    TRAIN --> MODEL[Model Training]
+    MODEL --> WF["Walk-Forward Backtesting<br/>(expanding window, repeated)"]
+
+    WF --> BT[Backtest Simulation]
+    HOLD --> BT
+    BT --> BEST[Best Strategy Selected]
+    BEST --> LIVE[Deployed to Live Signal Service]
+
+    classDef data fill:#e8f0fe,stroke:#4285f4,color:#1a1a1a;
+    classDef train fill:#fce8e6,stroke:#ea4335,color:#1a1a1a;
+    classDef val fill:#e6f4ea,stroke:#34a853,color:#1a1a1a;
+    classDef out fill:#fef7e0,stroke:#fbbc04,color:#1a1a1a;
+    class D1,D2,FE data;
+    class TRAIN,MODEL,WF train;
+    class HOLD,BT val;
+    class BEST,LIVE out;
+```
+
+The held-out year is never used in training or in the walk-forward loop — a
+final, one-time check on a stretch of time the model never learned from. See
+[methodology.md](docs/methodology.md) for the full explanation, including
+what "walk-forward" means here and a research-integrity note about a
+look-ahead bug that was caught and fixed.
+
 ## Headline result
 
 Since launch (2026-02-17), **116 real executed trades** (reconstructed from
