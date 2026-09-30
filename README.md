@@ -1,8 +1,6 @@
 # Form 4 Insider-Signal Pipeline
 
-An automated pipeline that watches SEC Form 4 filings for insider open-market
-purchases, filters them by the filing insider's own historical track record,
-and surfaces the ones worth paying attention to via a small live service.
+An automated SEC Form 4 parser which filters and emits transactions matching specific criteria.
 
 This repo showcases the **general architecture, data pipeline, and research
 methodology** behind that service, plus **real performance data** for the
