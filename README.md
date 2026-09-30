@@ -14,27 +14,12 @@ are not included.
 flowchart TD
     LMD[Live Market Data]
 
-    subgraph COLUMNS[" "]
-        direction LR
-        subgraph SP[Signal Pipeline]
-            direction TB
-            SEC[SEC EDGAR] --> API[Submissions API]
-            API --> XML[XML Parser]
-            XML --> SIG((Signal Emitted))
-        end
-        subgraph TP[QuantConnect Trading Platform]
-            direction TB
-            ING["Market Data Ingestion &<br/>Portfolio Sizing"]
-            ORD[Emit Live Order]
-            MGT[Order Management]
-            EXIT["Position Exit<br/>(30 days)"]
-            ING --> ORD --> MGT --> EXIT
-        end
-    end
+    SEC[SEC EDGAR] --> API[Submissions API] --> XML[XML Parser] --> SIG((Signal Emitted))
+    ING["Market Data Ingestion &<br/>Portfolio Sizing"] --> ORD[Emit Live Order] --> MGT[Order Management] --> EXIT["Position Exit<br/>30 days"]
 
     LMD --> SEC
     LMD --> ING
-    SIG --> ING
+    SIG --> ORD
 
     classDef data fill:#e8f0fe,stroke:#4285f4,color:#1a1a1a;
     classDef sig fill:#e6f4ea,stroke:#34a853,color:#1a1a1a;
@@ -44,7 +29,9 @@ flowchart TD
     class ING,ORD,MGT,EXIT trade;
 ```
 
-See [architecture.md](docs/architecture.md) for what each stage actually does.
+Left (green): the signal pipeline. Right (yellow): the QuantConnect trading
+platform. See [architecture.md](docs/architecture.md) for what each stage
+actually does.
 
 ### Research & training pipeline
 

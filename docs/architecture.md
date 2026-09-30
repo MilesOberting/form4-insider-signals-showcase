@@ -6,27 +6,12 @@
 flowchart TD
     LMD[Live Market Data]
 
-    subgraph COLUMNS[" "]
-        direction LR
-        subgraph SP[Signal Pipeline]
-            direction TB
-            SEC[SEC EDGAR] --> API[Submissions API]
-            API --> XML[XML Parser]
-            XML --> SIG((Signal Emitted))
-        end
-        subgraph TP[QuantConnect Trading Platform]
-            direction TB
-            ING["Market Data Ingestion &<br/>Portfolio Sizing"]
-            ORD[Emit Live Order]
-            MGT[Order Management]
-            EXIT["Position Exit<br/>(30 days)"]
-            ING --> ORD --> MGT --> EXIT
-        end
-    end
+    SEC[SEC EDGAR] --> API[Submissions API] --> XML[XML Parser] --> SIG((Signal Emitted))
+    ING["Market Data Ingestion &<br/>Portfolio Sizing"] --> ORD[Emit Live Order] --> MGT[Order Management] --> EXIT["Position Exit<br/>30 days"]
 
     LMD --> SEC
     LMD --> ING
-    SIG --> ING
+    SIG --> ORD
 
     classDef data fill:#e8f0fe,stroke:#4285f4,color:#1a1a1a;
     classDef sig fill:#e6f4ea,stroke:#34a853,color:#1a1a1a;
@@ -35,6 +20,9 @@ flowchart TD
     class SEC,API,XML,SIG sig;
     class ING,ORD,MGT,EXIT trade;
 ```
+
+Left (green): the signal pipeline. Right (yellow): the QuantConnect trading
+platform.
 
 Every price, market-cap, and benchmark figure used anywhere in this
 pipeline — the win-rate gate below, and the backtesting/research pipeline in
@@ -104,10 +92,11 @@ Once inside QuantConnect, the signal is combined with **live market data**
 (current quotes, available cash, existing positions) to decide on and manage
 a real trade:
 
-- **Market data ingestion & portfolio sizing** — the algorithm ingests live
-  market data and combines it with the incoming signal to size the trade
-  against the rest of the portfolio.
-- **Order emission** — a live order is submitted to the broker.
+- **Market data ingestion & portfolio sizing** — the algorithm continuously
+  ingests live market data (quotes, cash, existing positions) to know what
+  it could size a new trade at.
+- **Order emission** — when a signal arrives, it's combined with that
+  sizing context and a live order is submitted to the broker.
 - **Order management** — the algorithm tracks the resting order and any
   resulting position, handling fills, rejections, and retries.
 - **Position exit** — positions are automatically exited after a fixed
