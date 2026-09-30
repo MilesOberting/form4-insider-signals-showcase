@@ -9,7 +9,8 @@ compute_signal_returns for why), benchmarked against IWM's return over the
 identical window. Produces two aggregated artifacts:
 
   - summary_stats.csv   overall + monthly win rate / return / alpha
-  - performance_chart.png   cumulative "took every signal" vs IWM buy-and-hold
+  - performance_chart.png   daily mark-to-market equity curve vs. IWM at the
+    same entry dates (see build_chart)
 
 No row-level signal data is written out - only the aggregates above.
 """
@@ -135,6 +136,7 @@ def compute_signal_returns(df: pd.DataFrame, price_hist: dict, iwm: pd.Series, a
                 "status": "scored",
                 "entry_price": entry_price,
                 "exit_price": exit_price,
+                "iwm_entry_price": iwm_entry,
                 "return_30d": signal_return,
                 "iwm_return_30d": iwm_return,
                 "alpha_30d": signal_return - iwm_return,
@@ -172,44 +174,76 @@ def summarize(scored: pd.DataFrame) -> pd.DataFrame:
     return pd.concat([pd.DataFrame([overall]), monthly_summary], ignore_index=True)
 
 
-def build_chart(scored: pd.DataFrame, out_path: str) -> None:
+def build_daily_index(
+    legs: list[tuple],  # (entry_date, exit_date, notional, entry_price, price_series)
+    total_notional: float,
+    date_index: pd.DatetimeIndex,
+) -> pd.Series:
     """
-    Two lines, both built with the EXACT same method - an expanding mean of
-    matched 30-day returns, equal-weighted, non-compounding, indexed to
-    100 = 0% average return - so the only difference between them is which
-    asset was "bought":
-      - "Live signals": each signal's own realized 30d return.
-      - "IWM at the same entry dates": IWM's OWN 30d return starting from
-        that same signal's entry date, i.e. "what if every one of these
-        trades had bought IWM instead, at the same time, for the same 30
-        days." This is a matched-timing comparison, not IWM buy-and-hold -
-        buy-and-hold would mix in market-timing luck from choosing when to
-        start holding, which isn't what either line is trying to show.
+    Daily mark-to-market portfolio index, 100 = fully in cash.
 
-    Both lines share one true, non-arbitrary starting point: a day-zero
-    anchor (before any signal existed) where both indices are exactly 100 by
-    definition - zero trades means zero return for both, no data needed to
-    justify it. From there, both are the real, unsmoothed expanding mean; an
-    earlier version instead independently rebased each line to 100 at a
-    later, trimmed starting point, which silently erased the real gap
-    between them (the thing this chart exists to show) and is why that
-    version looked backwards relative to the actual win-rate/alpha numbers.
-    The very first several real points will look noisy - an average of 1-2
-    trades swings a lot - and that noise is genuine, not a bug.
+    Every leg contributes its own notional slice of a fixed capital base
+    (`total_notional`, sized so every signal could in principle be held at
+    once - never actually all open simultaneously) while it's open, tracking
+    that leg's own daily price path; unallocated capital sits flat as cash.
+    This is a standard day-by-day equity curve, not an average of returns -
+    it doesn't jump the moment a trade is "counted," it moves smoothly as
+    each open position's price actually moves, which is why it doesn't
+    exhibit the small-sample noise of averaging discrete trade outcomes.
     """
-    ordered = scored.sort_values("entry_date").reset_index(drop=True)
-    ordered["signal_index"] = 100 * (1 + ordered["return_30d"].expanding().mean())
-    ordered["iwm_index"] = 100 * (1 + ordered["iwm_return_30d"].expanding().mean())
+    invested_value = pd.Series(0.0, index=date_index)
+    committed_notional = pd.Series(0.0, index=date_index)
 
-    anchor_date = ordered["entry_date"].iloc[0] - pd.Timedelta(days=1)
-    anchor = pd.DataFrame({"entry_date": [anchor_date], "signal_index": [100.0], "iwm_index": [100.0]})
-    plotted = pd.concat([anchor, ordered[["entry_date", "signal_index", "iwm_index"]]], ignore_index=True)
+    for entry_date, exit_date, notional, entry_price, series in legs:
+        window = date_index[(date_index >= entry_date) & (date_index <= exit_date)]
+        if len(window) == 0 or series is None or entry_price in (None, 0):
+            continue
+        prices = series.reindex(date_index).ffill().reindex(window)
+        leg_value = notional * (prices / entry_price)
+        invested_value.loc[window] += leg_value.fillna(notional)
+        committed_notional.loc[window] += notional
+
+    portfolio_value = (total_notional - committed_notional) + invested_value
+    return 100 * portfolio_value / total_notional
+
+
+def build_chart(scored: pd.DataFrame, price_hist: dict, iwm: pd.Series, out_path: str) -> None:
+    """
+    Two lines, both a daily mark-to-market equity curve for a hypothetical
+    account sized to hold every signal at once (never actually fully
+    deployed - most days most of that capital sits idle as cash), so the
+    only difference between them is which asset each slice of capital is
+    invested in while a signal is open:
+      - "Live signals": each signal's own ticker, its actual daily price
+        path from entry to a 30-day exit.
+      - "IWM at the same entry dates": the same capital, same entry dates,
+        same 30-day windows, invested in IWM instead. Deliberately not IWM
+        buy-and-hold, which would mix in market-timing luck from a single
+        start date rather than isolating "same money, same timing, different
+        asset."
+    """
+    legs = [
+        (row.entry_date, row.entry_date + timedelta(days=FORWARD_DAYS), 1.0, row.entry_price, price_hist.get(row.ticker))
+        for row in scored.itertuples()
+    ]
+    iwm_legs = [
+        (row.entry_date, row.entry_date + timedelta(days=FORWARD_DAYS), 1.0, row.iwm_entry_price, iwm)
+        for row in scored.itertuples()
+    ]
+    total_notional = float(len(scored))
+
+    start = scored["entry_date"].min()
+    end = (scored["entry_date"] + timedelta(days=FORWARD_DAYS)).max()
+    date_index = pd.bdate_range(start, end)
+
+    signal_index = build_daily_index(legs, total_notional, date_index)
+    iwm_index = build_daily_index(iwm_legs, total_notional, date_index)
 
     fig, ax = plt.subplots(figsize=(9, 5))
-    ax.plot(plotted["entry_date"], plotted["signal_index"], label="Live signals (equal-weight, non-compounding)", linewidth=2)
-    ax.plot(plotted["entry_date"], plotted["iwm_index"], label="IWM at the same entry dates", linewidth=2)
+    ax.plot(date_index, signal_index, label="Live signals (equal-weight)", linewidth=2)
+    ax.plot(date_index, iwm_index, label="IWM at the same entry dates", linewidth=2)
     ax.set_title("Live Form 4 Signal Performance vs. IWM, Matched by Entry Date")
-    ax.set_ylabel("Index (100 = start)")
+    ax.set_ylabel("Index (100 = fully in cash)")
     ax.legend()
     ax.grid(alpha=0.3)
     fig.tight_layout()
@@ -249,7 +283,7 @@ def main():
     summary.to_csv(args.out_stats, index=False)
     print(f"Wrote {args.out_stats}")
 
-    build_chart(scored, args.out_chart)
+    build_chart(scored, price_hist, iwm_hist, args.out_chart)
     print(f"Wrote {args.out_chart}")
 
 

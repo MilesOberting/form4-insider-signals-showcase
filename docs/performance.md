@@ -37,12 +37,14 @@ which asset was bought.
 
 ![Real trades vs IWM](../assets/real_trades_chart.png)
 
-Both lines use the same method — a dollar-weighted expanding average of
-matched returns — and both start at exactly 100 on the same real date: the
-day before the first trade, where "zero trades, zero return" is true for
-both by definition, not fitted to the data. From there they're the real,
-unsmoothed numbers, so the early section will look noisy (an average of 1-2
-trades swings a lot) — that's genuine small-sample behavior, not an error.
+Both lines are a genuine day-by-day equity curve, not an average of returns:
+a hypothetical account sized to hold every trade at once (in practice, most
+of that capital sits idle as cash most days, since positions don't all
+overlap) marks each open position to market daily using its real price path,
+whether that position is in the real traded stock or, on the second line,
+IWM instead — same entry date, same exit date, same dollar amount either
+way. Both necessarily start at exactly 100 (before the first trade, the
+whole account is cash), and move smoothly from there.
 
 Only percentage returns are published here. No dollar amounts, account
 balances, or individual trade records (tickers, dates, position sizes) are
@@ -102,14 +104,12 @@ signals cross the 30-day scoring threshold every day — see
 
 ![Live signals vs IWM](../assets/performance_chart.png)
 
-Two lines, equal-weighted rather than dollar-weighted (there's no real
-position size to weight by for a signal that was never traded), otherwise
-built the same way as the real-trades chart above: an expanding average of
-matched 30-day returns on a common scale, comparing each signal's own return
-to IWM's return over that same signal's own entry/exit window (not IWM
-buy-and-hold, which would mix in market-timing luck from a single start
-date). The chart stops about a month before today, since recent signals
-don't have a resolved 30-day return yet.
+Same day-by-day mark-to-market method as the real-trades chart above, but
+equal-weighted rather than dollar-weighted (there's no real position size to
+weight by for a signal that was never traded), and every signal held for a
+fixed 30 days rather than a real, variable exit date. The chart stops about a
+month before today, since recent signals don't have a resolved 30-day window
+yet.
 
 This is close to the real-trades numbers above, which is a reasonable
 consistency check, but it isn't the same measurement — see the previous
@@ -124,11 +124,15 @@ count.
   logic changed more than once during this window (see
   [architecture.md](architecture.md)); early signals don't reflect the
   current rule exactly.
-- **Entry price basis (raw-signal section only).** Entry price there is the
-  market close on the signal date, not the filing's own reported price,
-  which turned out to be an unreliable basis for a handful of foreign-listed
-  issuers (unit/currency mismatches). The real-trades section doesn't have
-  this issue — it uses actual fill prices.
+- **Entry price basis.** Realized-return figures (the table, and the
+  real-trades section's per-trade stats) use the real fill price where one
+  exists. The day-by-day *charts* for both sections instead anchor to the
+  price-data provider's own close on the entry date, even for real trades —
+  a handful of tickers have had a real corporate action (e.g. a reverse
+  split) between the trade date and today that the data provider's history
+  retroactively restates, which would otherwise silently mismatch a real
+  fill price against today's adjusted series and distort the chart. This
+  doesn't change the realized-return table, only how the chart is drawn.
 - **Survivorship.** Price data (both sections) is sourced from a public
   market-data provider, which can silently exclude delisted tickers from
   history — a real but typically small upward bias.
