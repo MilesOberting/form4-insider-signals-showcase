@@ -1,0 +1,9 @@
+.DS_Store
+__pycache__/
+*.pyc
+*.egg-info/
+.venv/
+venv/
+.env
+*.log
+.stock_term_cache.json
