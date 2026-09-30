@@ -18,8 +18,8 @@ flowchart TD
     D1 --> FE[Feature Engineering]
     D2 --> FE
 
-    FE --> TRAIN["Training Period<br/>(earlier years)"]
-    FE --> HOLD["Held-Out Year<br/>(never trained on)"]
+    FE --> TRAIN["Training Period<br/>(through Q1 2025)"]
+    FE --> HOLD["Held-Out Period<br/>(Q2 2025 onward, never trained on)"]
 
     TRAIN --> MODEL[Model Training]
     MODEL --> WF["Walk-Forward Backtesting<br/>(expanding window, repeated)"]
@@ -39,13 +39,16 @@ flowchart TD
     class BEST,LIVE out;
 ```
 
-The **held-out year** is never seen during training or during the
-walk-forward loop — it exists purely as a final, one-time check on a stretch
-of time the model had no opportunity to learn from. The **walk-forward
-backtesting** loop is the "expanding window" mentioned above: train on an
-initial period, validate on the period right after it, then expand the
-training window to include that period and validate on the next one, and so
-on — a repeated, rolling process rather than a single train/test split. This
+The split is a single chronological cutoff at Q1/Q2 2025, applied
+consistently across model training, hyperparameter search, and backtesting:
+everything before the cutoff trains, everything from the cutoff forward is
+**held out and never trained on** — used only to check performance on data
+the model genuinely hasn't seen. It's a quarter boundary, not a full excluded
+calendar year. The **walk-forward backtesting** loop is the "expanding
+window" mentioned above: train on an initial period, validate on the period
+right after it, then expand the training window to include that period and
+validate on the next one, and so on — a repeated, rolling process rather than
+a single train/test split. This
 catches a strategy that only works in one specific historical regime, which a
 single split could miss.
 

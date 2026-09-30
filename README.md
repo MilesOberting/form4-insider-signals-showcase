@@ -40,8 +40,8 @@ flowchart TD
     D1[Bulk SEC EDGAR<br/>Form 4 Filings] --> FE[Feature Engineering]
     D2[Daily Price History<br/>Yahoo Finance] --> FE
 
-    FE --> TRAIN["Training Period<br/>(earlier years)"]
-    FE --> HOLD["Held-Out Year<br/>(never trained on)"]
+    FE --> TRAIN["Training Period<br/>(through Q1 2025)"]
+    FE --> HOLD["Held-Out Period<br/>(Q2 2025 onward, never trained on)"]
 
     TRAIN --> MODEL[Model Training]
     MODEL --> WF["Walk-Forward Backtesting<br/>(expanding window, repeated)"]
@@ -61,8 +61,10 @@ flowchart TD
     class BEST,LIVE out;
 ```
 
-The held-out year is never used in training or in the walk-forward loop — a
-final, one-time check on a stretch of time the model never learned from. See
+A single chronological cutoff (Q1/Q2 2025) separates training from
+validation, applied consistently across model training, hyperparameter
+search, and backtesting — data on or after the cutoff is never used for
+training, only to check performance on data the model hasn't seen. See
 [methodology.md](docs/methodology.md) for the full explanation, including
 what "walk-forward" means here and a research-integrity note about a
 look-ahead bug that was caught and fixed.
