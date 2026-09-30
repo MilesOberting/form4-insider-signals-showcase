@@ -72,14 +72,15 @@ look-ahead bug that was caught and fixed.
 ## Headline result
 
 Since launch (2026-02-17), **116 real executed trades** (reconstructed from
-actual brokerage fills — real entry/exit dates, real position sizes) have
-beaten IWM, bought at those exact same times and sizes, **57.8% of the time**,
-with a dollar-weighted mean return of **+3.7%** vs. **+1.5%** for the matched
-IWM trades — a **+2.3 percentage point** edge. Those 116 trades came from 636
-raw signals emitted by the live service; most signals never become a real
-trade once real execution constraints (cash, exposure limits, dedup) are
-applied. See [`docs/performance.md`](docs/performance.md) for the full
-writeup, the raw-signal-only comparison, methodology, and limitations.
+actual brokerage fills — real entry/exit dates, real position sizes, capital
+reused as positions close) have returned **+17.8%** cumulatively, beating a
+matched IWM comparison's **+7.4%** over the same trades' exact dates and
+sizes — and beat IWM outright on **57.8%** of individual trades. Those 116
+trades came from 636 raw signals emitted by the live service; most signals
+never become a real trade once real execution constraints (cash, exposure
+limits, dedup) are applied. See [`docs/performance.md`](docs/performance.md)
+for the full writeup, the raw-signal-only comparison, methodology, and
+limitations.
 
 ## Read more
 

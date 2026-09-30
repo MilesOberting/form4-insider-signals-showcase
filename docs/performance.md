@@ -24,27 +24,35 @@ this writing aren't included, since they don't have a real exit yet.
 | Round trips completed | **116** (out of 636 raw signals emitted — most signals never become a trade; see below) |
 | Unique tickers traded | 92 |
 | Win rate vs. IWM (same dates) | **57.8%** |
-| Dollar-weighted mean return | **+3.7%** |
-| Dollar-weighted mean IWM return (same dates, same dollar amounts) | +1.5% |
-| Dollar-weighted mean alpha | **+2.3pp** |
+| Cumulative return, capital reused across all 116 trades | **+17.8%** |
+| Same, for IWM at the same dates & sizes | +7.4% |
+| Dollar-weighted mean return *per trade* | +3.7% |
+| Dollar-weighted mean IWM return *per trade* (same dates, same amounts) | +1.5% |
 
-"Dollar-weighted" means a $5,000 trade counts five times as much toward the
-average as a $1,000 trade — matching how the results actually add up in a
-real account, rather than treating every trade as equal-size. The IWM side of
-the comparison uses the *same* dollar amount and the *same* entry/exit dates
-as the real trade it's matched against, so the only variable that differs is
-which asset was bought.
+Two different, both-honest numbers: the **cumulative** figure reflects that
+the same capital gets reused as positions close and new ones open — 116
+times across 92 tickers over ~7 months — so it's the closer match to "how
+much did this actually add up to." The **per-trade average** answers a
+narrower question (was the typical trade good?) and is naturally smaller,
+since it doesn't give credit for capital being reused many times over. The
+IWM comparison uses the *same* dollar amount and the *same* entry/exit dates
+as the real trade it's matched against either way, so the only variable that
+differs is which asset was bought.
 
 ![Real trades vs IWM](../assets/real_trades_chart.png)
 
 Both lines are a genuine day-by-day equity curve, not an average of returns:
-a hypothetical account sized to hold every trade at once (in practice, most
-of that capital sits idle as cash most days, since positions don't all
-overlap) marks each open position to market daily using its real price path,
-whether that position is in the real traded stock or, on the second line,
-IWM instead — same entry date, same exit date, same dollar amount either
-way. Both necessarily start at exactly 100 (before the first trade, the
-whole account is cash), and move smoothly from there.
+a capital pool sized to the peak amount ever committed at once (the smallest
+base that could actually run this trade sequence) opens a position by
+debiting its cost, marks every open position to market daily using its real
+price path, and — this is the part that makes it cumulative — credits a
+closed position's *actual ending value*, gain or loss included, back to cash
+so it's available to fund the next trade. An earlier version of this chart
+returned only a closed trade's original cost to cash, which silently
+discarded every realized gain from the running total and made the chart
+converge on the per-trade average instead of the real compounding effect.
+Both lines necessarily start at exactly 100 (before the first trade, the
+whole pool is cash) and move smoothly from there.
 
 Only percentage returns are published here. No dollar amounts, account
 balances, or individual trade records (tickers, dates, position sizes) are
@@ -62,49 +70,47 @@ declines an order. Most emitted signals don't survive all of that — which is
 exactly why the "raw signal quality" numbers below shouldn't be read as "what
 the account did."
 
-### Why "+3.7% average per trade" looks smaller than the account's actual gain
+### How this relates to the account's overall gain
 
 The account runs two strategies (see [architecture.md](architecture.md)):
 this one, and an unrelated second strategy trading a completely different
 universe of tickers. Comparing realized profit between the two, **this
 strategy accounts for roughly 86% of the account's total realized trading
 profit** over the same period — it's the dominant driver, not a minor
-contributor.
-
-That's not in tension with a modest "+3.7% average per trade" — they're
-different units. The account's capital gets *reused*: the same dollars close
-one 30-day position and open another, over and over, 116 times across 92
-tickers over ~7 months. A modest edge repeated that many times compounds into
-a real cumulative effect on the account far larger than any single trade's
-average return would suggest. "Average return per trade" and "total realized
-contribution to the account" are both honest numbers — they just answer
-different questions, and only the second one is comparable to "the account is
-up X% and most of that is this strategy."
+contributor, which the +17.8% cumulative figure above is now consistent
+with (the two won't match exactly — this repo's reconstruction is one
+strategy in isolation with its own capital-reuse assumption, not a
+full account replica, and it excludes the handful of still-open positions'
+unrealized P&L).
 
 ## Raw signal quality (for context)
 
 **What this measures, precisely:** the raw signal feed itself, before
 execution. It's "take every emitted signal, weight them equally, hold each
-for exactly 30 days, don't compound" — a diagnostic of signal quality, not a
-reconstruction of any real trading activity.
+for exactly 30 days" — a diagnostic of signal quality, not a reconstruction
+of any real trading activity.
 
 | Metric | Value |
 |---|---|
 | Live signal history | 2026-02-17 – present |
 | Total signals emitted | 636 |
 | Signals scored (30-day window elapsed) | 569 |
+| Peak signals open at once | 163 |
 | Win rate vs. IWM (30d) | 57.6% |
-| Mean 30-day return per signal | +3.5% |
-| Mean IWM 30-day return over the same windows | +0.9% |
-| Mean alpha vs. IWM per signal | +2.6pp |
+| Cumulative return, capital reused across all scored signals | +12.3% |
+| Same, for IWM at the same dates | +3.1% |
+| Mean return *per signal* | +3.5% |
+| Mean IWM return *per signal* (same windows) | +0.9% |
 
 (These figures shift slightly each time the analysis is re-run, since more
 signals cross the 30-day scoring threshold every day — see
-[`analysis/summary_stats.csv`](../analysis/summary_stats.csv).)
+[`analysis/summary_stats.csv`](../analysis/summary_stats.csv), which has the
+per-signal figures; the cumulative figures are only in this doc and the
+chart.)
 
 ![Live signals vs IWM](../assets/performance_chart.png)
 
-Same day-by-day mark-to-market method as the real-trades chart above, but
+Same day-by-day, capital-reuse method as the real-trades chart above, but
 equal-weighted rather than dollar-weighted (there's no real position size to
 weight by for a signal that was never traded), and every signal held for a
 fixed 30 days rather than a real, variable exit date. The chart stops about a

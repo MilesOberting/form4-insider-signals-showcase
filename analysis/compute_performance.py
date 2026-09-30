@@ -146,7 +146,7 @@ def compute_signal_returns(df: pd.DataFrame, price_hist: dict, iwm: pd.Series, a
     return pd.DataFrame(records)
 
 
-def summarize(scored: pd.DataFrame) -> pd.DataFrame:
+def summarize(scored: pd.DataFrame, cumulative_return: float = None, cumulative_iwm_return: float = None) -> pd.DataFrame:
     overall = {
         "period": "overall",
         "signal_count": len(scored),
@@ -155,6 +155,8 @@ def summarize(scored: pd.DataFrame) -> pd.DataFrame:
         "median_return_30d": scored["return_30d"].median(),
         "mean_iwm_return_30d": scored["iwm_return_30d"].mean(),
         "mean_alpha_30d": scored["alpha_30d"].mean(),
+        "cumulative_return": cumulative_return,
+        "cumulative_iwm_return": cumulative_iwm_return,
     }
 
     monthly = scored.copy()
@@ -174,45 +176,84 @@ def summarize(scored: pd.DataFrame) -> pd.DataFrame:
     return pd.concat([pd.DataFrame([overall]), monthly_summary], ignore_index=True)
 
 
+def peak_concurrent_notional(legs: list[tuple], date_index: pd.DatetimeIndex) -> float:
+    """
+    The smallest capital base that could actually run this exact sequence of
+    trades at once, at any point in time - i.e. real, reused capital, not a
+    pool large enough to take every trade simultaneously without ever
+    freeing any of it up.
+    """
+    committed = pd.Series(0.0, index=date_index)
+    for entry_date, exit_date, notional, _, _ in legs:
+        window = date_index[(date_index >= entry_date) & (date_index <= exit_date)]
+        committed.loc[window] += notional
+    return float(committed.max())
+
+
 def build_daily_index(
     legs: list[tuple],  # (entry_date, exit_date, notional, entry_price, price_series)
     total_notional: float,
     date_index: pd.DatetimeIndex,
 ) -> pd.Series:
     """
-    Daily mark-to-market portfolio index, 100 = fully in cash.
-
-    Every leg contributes its own notional slice of a fixed capital base
-    (`total_notional`, sized so every signal could in principle be held at
-    once - never actually all open simultaneously) while it's open, tracking
-    that leg's own daily price path; unallocated capital sits flat as cash.
-    This is a standard day-by-day equity curve, not an average of returns -
-    it doesn't jump the moment a trade is "counted," it moves smoothly as
-    each open position's price actually moves, which is why it doesn't
-    exhibit the small-sample noise of averaging discrete trade outcomes.
+    Daily mark-to-market equity curve, 100 = fully in cash, with real
+    capital reuse: opening a position debits its notional from cash; every
+    open position is marked to market daily; when a position's exit date
+    arrives, its CURRENT mark-to-market value - not its original notional -
+    is credited back to cash, so a realized gain or loss actually changes
+    how much capital is available for the next trade. An earlier version
+    returned only the original notional to cash on exit, which silently
+    discarded every closed trade's P&L from the running total and made the
+    chart converge on the simple average return instead of the real
+    compounding effect of reusing the same capital many times over.
     """
-    invested_value = pd.Series(0.0, index=date_index)
-    committed_notional = pd.Series(0.0, index=date_index)
+    series_cache: dict[int, pd.Series] = {}
 
-    for entry_date, exit_date, notional, entry_price, series in legs:
-        window = date_index[(date_index >= entry_date) & (date_index <= exit_date)]
-        if len(window) == 0 or series is None or entry_price in (None, 0):
-            continue
-        prices = series.reindex(date_index).ffill().reindex(window)
-        leg_value = notional * (prices / entry_price)
-        invested_value.loc[window] += leg_value.fillna(notional)
-        committed_notional.loc[window] += notional
+    def reindexed(series: pd.Series) -> pd.Series:
+        key = id(series)
+        if key not in series_cache:
+            series_cache[key] = series.reindex(date_index).ffill()
+        return series_cache[key]
 
-    portfolio_value = (total_notional - committed_notional) + invested_value
-    return 100 * portfolio_value / total_notional
+    entries_by_date: dict = {}
+    for leg in legs:
+        entries_by_date.setdefault(leg[0], []).append(leg)
+
+    cash = total_notional
+    open_positions = []
+    index_values = []
+    for day in date_index:
+        for entry_date, exit_date, notional, entry_price, series in entries_by_date.get(day, []):
+            cash -= notional
+            open_positions.append(
+                {"notional": notional, "entry_price": entry_price, "series": series, "exit_date": exit_date}
+            )
+
+        day_value = 0.0
+        still_open = []
+        for pos in open_positions:
+            price = None
+            if pos["series"] is not None:
+                rs = reindexed(pos["series"])
+                if day in rs.index:
+                    price = rs.loc[day]
+            value = pos["notional"] * (price / pos["entry_price"]) if (price and pos["entry_price"]) else pos["notional"]
+            if day >= pos["exit_date"]:
+                cash += value
+            else:
+                day_value += value
+                still_open.append(pos)
+        open_positions = still_open
+        index_values.append(100 * (cash + day_value) / total_notional)
+
+    return pd.Series(index_values, index=date_index)
 
 
 def build_chart(scored: pd.DataFrame, price_hist: dict, iwm: pd.Series, out_path: str) -> None:
     """
-    Two lines, both a daily mark-to-market equity curve for a hypothetical
-    account sized to hold every signal at once (never actually fully
-    deployed - most days most of that capital sits idle as cash), so the
-    only difference between them is which asset each slice of capital is
+    Two lines, both a daily mark-to-market equity curve with capital reused
+    across signals as positions close (see build_daily_index), so the only
+    difference between them is which asset each slice of capital is
     invested in while a signal is open:
       - "Live signals": each signal's own ticker, its actual daily price
         path from entry to a 30-day exit.
@@ -221,6 +262,12 @@ def build_chart(scored: pd.DataFrame, price_hist: dict, iwm: pd.Series, out_path
         buy-and-hold, which would mix in market-timing luck from a single
         start date rather than isolating "same money, same timing, different
         asset."
+
+    The capital base is sized to the peak number of signals ever open at
+    once (equal-weighted, so "notional" is just a count here) - the
+    smallest base that could have actually run this exact sequence - not
+    the total number of signals ever emitted, which would imply capital is
+    never reused and understate the real compounding effect.
     """
     legs = [
         (row.entry_date, row.entry_date + timedelta(days=FORWARD_DAYS), 1.0, row.entry_price, price_hist.get(row.ticker))
@@ -230,24 +277,26 @@ def build_chart(scored: pd.DataFrame, price_hist: dict, iwm: pd.Series, out_path
         (row.entry_date, row.entry_date + timedelta(days=FORWARD_DAYS), 1.0, row.iwm_entry_price, iwm)
         for row in scored.itertuples()
     ]
-    total_notional = float(len(scored))
 
     start = scored["entry_date"].min()
     end = (scored["entry_date"] + timedelta(days=FORWARD_DAYS)).max()
     date_index = pd.bdate_range(start, end)
+    total_notional = peak_concurrent_notional(legs, date_index)
 
     signal_index = build_daily_index(legs, total_notional, date_index)
     iwm_index = build_daily_index(iwm_legs, total_notional, date_index)
 
     fig, ax = plt.subplots(figsize=(9, 5))
-    ax.plot(date_index, signal_index, label="Live signals (equal-weight)", linewidth=2)
+    ax.plot(date_index, signal_index, label="Live signals (capital reused as it frees up)", linewidth=2)
     ax.plot(date_index, iwm_index, label="IWM at the same entry dates", linewidth=2)
     ax.set_title("Live Form 4 Signal Performance vs. IWM, Matched by Entry Date")
-    ax.set_ylabel("Index (100 = fully in cash)")
+    ax.set_ylabel("Index (100 = start)")
     ax.legend()
     ax.grid(alpha=0.3)
     fig.tight_layout()
     fig.savefig(out_path, dpi=150)
+
+    return signal_index.iloc[-1] / 100 - 1, iwm_index.iloc[-1] / 100 - 1
 
 
 def main():
@@ -279,12 +328,13 @@ def main():
     print(f"{len(df)} total BUY signals, {len(scored)} scored (30d window elapsed + price data available)")
     print(results["status"].value_counts())
 
-    summary = summarize(scored)
+    cumulative_return, cumulative_iwm_return = build_chart(scored, price_hist, iwm_hist, args.out_chart)
+    print(f"Wrote {args.out_chart}")
+    print(f"Cumulative return (capital reused): {cumulative_return:.1%} vs IWM {cumulative_iwm_return:.1%}")
+
+    summary = summarize(scored, cumulative_return, cumulative_iwm_return)
     summary.to_csv(args.out_stats, index=False)
     print(f"Wrote {args.out_stats}")
-
-    build_chart(scored, price_hist, iwm_hist, args.out_chart)
-    print(f"Wrote {args.out_chart}")
 
 
 if __name__ == "__main__":
