@@ -176,7 +176,7 @@ def summarize(scored: pd.DataFrame) -> pd.DataFrame:
 def build_chart(scored: pd.DataFrame, iwm: pd.Series, out_path: str, burn_in: int = 10) -> None:
     """
     Two lines, both indexed to 100 at the entry date of the first plotted
-    signal:
+    signal, and both ending at the entry date of the LAST plotted signal:
       - "Live signals (equal-weight, non-compounding)": the expanding mean of
         each signal's own realized 30d return, applied to a 100-start index.
         This assumes equal capital per signal and does not compound trade to
@@ -189,6 +189,14 @@ def build_chart(scored: pd.DataFrame, iwm: pd.Series, out_path: str, burn_in: in
     dominated by whichever trade happened to come first, producing a sharp,
     meaningless spike/dip at the very start of the line. Full-sample stats
     in summary_stats.csv are unaffected by this - it only trims the chart.
+
+    The IWM line is clipped to the same end date as the signal line. `scored`
+    only contains signals whose 30-day window has already fully elapsed, so
+    the signal line necessarily stops about a month before today; letting the
+    IWM line run all the way to today would show the benchmark continuing
+    through a stretch that has no corresponding scored signal to compare it
+    against, which reads as the chart extending past the period it's actually
+    describing.
     """
     ordered = scored.sort_values("entry_date").reset_index(drop=True)
     ordered["cum_avg_return"] = ordered["return_30d"].expanding().mean()
@@ -197,7 +205,8 @@ def build_chart(scored: pd.DataFrame, iwm: pd.Series, out_path: str, burn_in: in
     signal_index = 100 * (1 + plotted["cum_avg_return"]) / rebase
 
     start_date = plotted["entry_date"].iloc[0]
-    iwm_window = iwm[iwm.index >= start_date]
+    end_date = plotted["entry_date"].iloc[-1]
+    iwm_window = iwm[(iwm.index >= start_date) & (iwm.index <= end_date)]
     iwm_index = 100 * (iwm_window / iwm_window.iloc[0])
 
     fig, ax = plt.subplots(figsize=(9, 5))

@@ -13,9 +13,9 @@ are not included.
 ## Headline result
 
 Since launch (2026-02-17), the live service's signals have beaten the Russell
-2000 (IWM) on a matched 30-day-return basis **58.7% of the time**, with a
-mean per-signal return of **+4.0%** vs. IWM's **+1.0%** over the same windows
-— computed independently from 559 scored live signals, not a backtest
+2000 (IWM) on a matched 30-day-return basis **57.6% of the time**, with a
+mean per-signal return of **+3.5%** vs. IWM's **+0.9%** over the same windows
+— computed independently from 569 scored live signals, not a backtest
 projection. See [`docs/performance.md`](docs/performance.md) for the full
 writeup, methodology, and limitations.
 

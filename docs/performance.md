@@ -9,14 +9,19 @@ differs from the offline research numbers.
 
 | Metric | Value |
 |---|---|
-| Live signal history | 2026-02-17 – 2026-09-29 (~7.5 months) |
+| Live signal history | 2026-02-17 – present |
 | Total signals emitted | 636 |
-| Signals scored (30-day window elapsed) | 559 |
-| Win rate vs. IWM (30d) | **58.7%** |
-| Mean 30-day return per signal | **+4.0%** |
-| Median 30-day return per signal | +2.8% |
-| Mean IWM 30-day return over the same windows | +1.0% |
-| Mean alpha vs. IWM per signal | **+2.9pp** |
+| Signals scored (30-day window elapsed) | 569 |
+| Win rate vs. IWM (30d) | **57.6%** |
+| Mean 30-day return per signal | **+3.5%** |
+| Median 30-day return per signal | +2.6% |
+| Mean IWM 30-day return over the same windows | +0.9% |
+| Mean alpha vs. IWM per signal | **+2.6pp** |
+
+(These figures shift slightly each time the analysis is re-run, since more
+signals cross the 30-day scoring threshold every day — see
+[`analysis/summary_stats.csv`](../analysis/summary_stats.csv) for the
+current numbers.)
 
 "Win" is defined the same way the live service's own gate defines it: a
 signal beats IWM over the identical 30-day window, not merely a positive
@@ -26,12 +31,18 @@ absolute return.
 
 ![Live signals vs IWM](../assets/performance_chart.png)
 
-Two lines, both indexed to 100:
+Two lines, both indexed to 100 and both ending on the same date:
 - **Live signals** — the expanding average return across every scored signal
   to date, equal-weighted and non-compounding. This tracks *average signal
   quality over time*, not a simulated brokerage account.
 - **IWM buy-and-hold** — simply holding the Russell 2000 ETF over the
   identical calendar span.
+
+The chart intentionally stops about a month before today: any signal from the
+last 30 days doesn't have a resolved 30-day return yet, so it isn't part of
+the scored comparison, and extending the benchmark line past that point would
+show it running through a stretch with no corresponding signal data to
+compare it against.
 
 Because the Russell 2000 held a strong rally for much of the summer, IWM's
 buy-and-hold line pulled ahead of the signal-quality line in cumulative terms
