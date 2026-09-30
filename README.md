@@ -12,19 +12,15 @@ are not included.
 
 ## Headline result
 
-Since launch (2026-02-17), the live service's signals have beaten the Russell
-2000 (IWM) on a matched 30-day-return basis **57.6% of the time**, with a
-mean per-signal return of **+3.5%** vs. IWM's **+0.9%** over the same windows
-— computed independently from 569 scored live signals, not a backtest
-projection. See [`docs/performance.md`](docs/performance.md) for the full
-writeup, methodology, and limitations.
-
-**Scope note:** this measures the raw signal itself — take every emitted
-signal, equal-weighted, hold 30 days, don't compound. It is not a
-reconstruction of any real trading account, which would also involve
-position sizing, compounding, and (in this case) an entirely separate
-strategy this repo doesn't cover at all. It's a measure of signal quality,
-not account P&L.
+Since launch (2026-02-17), **116 real executed trades** (reconstructed from
+actual brokerage fills — real entry/exit dates, real position sizes) have
+beaten IWM, bought at those exact same times and sizes, **57.8% of the time**,
+with a dollar-weighted mean return of **+3.7%** vs. **+1.5%** for the matched
+IWM trades — a **+2.3 percentage point** edge. Those 116 trades came from 636
+raw signals emitted by the live service; most signals never become a real
+trade once real execution constraints (cash, exposure limits, dedup) are
+applied. See [`docs/performance.md`](docs/performance.md) for the full
+writeup, the raw-signal-only comparison, methodology, and limitations.
 
 ## Read more
 
@@ -41,8 +37,11 @@ not account P&L.
 
 - The exact filter thresholds, scoring weights, or model hyperparameters —
   these are the tuned, proprietary part of the strategy.
-- Raw signal logs or transaction-level data — only aggregated, derived
-  results are published (see [`analysis/summary_stats.csv`](analysis/summary_stats.csv)).
+- Raw signal logs, brokerage account data, or transaction-level records
+  (tickers, dates, position sizes, dollar amounts) — only aggregated,
+  percentage-only results are published (see
+  [`analysis/summary_stats.csv`](analysis/summary_stats.csv) and
+  [`analysis/real_trades_summary.csv`](analysis/real_trades_summary.csv)).
 - The trading system's own logic (position sizing, order execution, exits) or
   its unrelated second strategy — only how it *receives* signals is described,
   generally, in [architecture.md](docs/architecture.md).
@@ -53,10 +52,13 @@ not account P&L.
 ## Repo contents
 
 ```
-docs/                    architecture, methodology, and performance write-ups
-assets/performance_chart.png   live-signal vs. IWM cumulative performance chart
-analysis/compute_performance.py   re-runnable script that produces the above
-analysis/summary_stats.csv        the aggregated output of that script
+docs/                              architecture, methodology, and performance write-ups
+assets/real_trades_chart.png       real executed trades vs. matched-size/date IWM (primary)
+assets/performance_chart.png       raw signal feed vs. matched-date IWM (secondary/context)
+analysis/compute_performance.py    re-runnable script for the raw-signal comparison
+analysis/summary_stats.csv         its aggregated output
+analysis/real_trades_summary.csv   aggregated real-trade output (not re-runnable here -
+                                    depends on private brokerage account access)
 ```
 
 `compute_performance.py` doesn't hardcode the live service's real endpoint
