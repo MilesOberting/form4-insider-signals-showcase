@@ -10,25 +10,36 @@ live service since launch. It's intentionally general — the specific filter
 thresholds, scoring weights, and model parameters that make the strategy work
 are not included.
 
-### Live signal pipeline
+### Live signal pipeline & trading system
 
 ```mermaid
 flowchart TD
-    A[SEC Form 4 Filings] --> B[EDGAR Full-Text Search]
-    B --> C["Submissions API<br/>(insider filing history)"]
-    C --> D[Filing XML Parser]
-    D --> E["Structural Filter<br/>(open-market purchases only)"]
-    E --> F[Market-Cap / Listing-Age Gate]
-    F --> G["Insider Win-Rate Gate<br/>(vs. Russell 2000)"]
-    G --> H((Signal Emitted))
-    H --> I["Trading System<br/>(separate project)"]
+    LMD[Live Market Data]
+
+    subgraph SP[Signal Pipeline]
+        SEC[SEC EDGAR] --> API[Submissions API]
+        API --> XML[XML Parser]
+        XML --> SIG((Signal Emitted))
+    end
+
+    subgraph TP[QuantConnect Trading Platform]
+        ING["Market Data Ingestion &<br/>Portfolio Sizing"]
+        ORD[Emit Live Order]
+        MGT[Order Management]
+        EXIT["Position Exit<br/>(30 days)"]
+        ING --> ORD --> MGT --> EXIT
+    end
+
+    LMD --> SEC
+    LMD --> ING
+    SIG --> ING
 
     classDef data fill:#e8f0fe,stroke:#4285f4,color:#1a1a1a;
-    classDef filt fill:#e6f4ea,stroke:#34a853,color:#1a1a1a;
-    classDef out fill:#fef7e0,stroke:#fbbc04,color:#1a1a1a;
-    class A,B,C,D data;
-    class E,F,G filt;
-    class H,I out;
+    classDef sig fill:#e6f4ea,stroke:#34a853,color:#1a1a1a;
+    classDef trade fill:#fef7e0,stroke:#fbbc04,color:#1a1a1a;
+    class LMD data;
+    class SEC,API,XML,SIG sig;
+    class ING,ORD,MGT,EXIT trade;
 ```
 
 See [architecture.md](docs/architecture.md) for what each stage actually does.
@@ -101,9 +112,10 @@ writeup, the raw-signal-only comparison, methodology, and limitations.
   percentage-only results are published (see
   [`analysis/summary_stats.csv`](analysis/summary_stats.csv) and
   [`analysis/real_trades_summary.csv`](analysis/real_trades_summary.csv)).
-- The trading system's own logic (position sizing, order execution, exits) or
-  its unrelated second strategy — only how it *receives* signals is described,
-  generally, in [architecture.md](docs/architecture.md).
+- The trading system's exact internal logic (sizing formulas, order-execution
+  edge cases, exact thresholds) or its unrelated second strategy — only the
+  high-level stages it goes through are described, in
+  [architecture.md](docs/architecture.md).
 - Any live service endpoints/URLs — the transport mechanism is described,
   but the actual addresses are withheld since those endpoints currently have
   no authentication layer.

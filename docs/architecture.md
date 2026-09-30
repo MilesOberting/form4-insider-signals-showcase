@@ -4,26 +4,36 @@
 
 ```mermaid
 flowchart TD
-    A[SEC Form 4 Filings] --> B["EDGAR Full-Text Search<br/>(filed today)"]
-    B --> C["Submissions API<br/>(per-insider filing history, paginated)"]
-    C --> D["Raw Filing XML<br/>(parsed for transaction details)"]
-    D --> E["Structural Filter<br/>(open-market purchases only)"]
-    E --> F["Market-Cap / Listing-Age Gate<br/>(public market data)"]
-    F --> G[Insider Historical Win-Rate Gate]
-    G --> H((Signal Emitted))
-    H --> I["Trading System<br/>(separate, not part of this repo)"]
+    LMD[Live Market Data]
+
+    subgraph SP[Signal Pipeline]
+        SEC[SEC EDGAR] --> API[Submissions API]
+        API --> XML[XML Parser]
+        XML --> SIG((Signal Emitted))
+    end
+
+    subgraph TP[QuantConnect Trading Platform]
+        ING["Market Data Ingestion &<br/>Portfolio Sizing"]
+        ORD[Emit Live Order]
+        MGT[Order Management]
+        EXIT["Position Exit<br/>(30 days)"]
+        ING --> ORD --> MGT --> EXIT
+    end
+
+    LMD --> SEC
+    LMD --> ING
+    SIG --> ING
 
     classDef data fill:#e8f0fe,stroke:#4285f4,color:#1a1a1a;
-    classDef filt fill:#e6f4ea,stroke:#34a853,color:#1a1a1a;
-    classDef out fill:#fef7e0,stroke:#fbbc04,color:#1a1a1a;
-    class A,B,C,D data;
-    class E,F,G filt;
-    class H,I out;
+    classDef sig fill:#e6f4ea,stroke:#34a853,color:#1a1a1a;
+    classDef trade fill:#fef7e0,stroke:#fbbc04,color:#1a1a1a;
+    class LMD data;
+    class SEC,API,XML,SIG sig;
+    class ING,ORD,MGT,EXIT trade;
 ```
 
 Every price, market-cap, and benchmark figure used anywhere in this
-pipeline — the market-cap/listing-age gate above, the IWM win-rate
-comparison below, and the backtesting/research pipeline in
+pipeline — the win-rate gate below, and the backtesting/research pipeline in
 [methodology.md](methodology.md) — comes from **Yahoo Finance** (via the
 `yfinance` library), a free public market-data source. There's no separate
 paid data vendor and no distinct "test data" set: research and live
@@ -70,8 +80,9 @@ for the [performance analysis](performance.md) in this repo.
 ## How signals reach the trading system
 
 An automated trading system — a separate project, not part of this repo —
-consumes this feed and actually places orders. The transport between them is
-deliberately simple:
+consumes this feed and actually places orders. It runs on **QuantConnect**, a
+cloud algorithmic-trading platform. The transport between the signal feed and
+the trading system is deliberately simple:
 
 - The "current signal" feed is plain CSV over HTTPS, polled by the trading
   system on a short, fixed interval during market hours.
@@ -84,6 +95,23 @@ deliberately simple:
   That's a known, deliberate simplicity tradeoff for a small personal system,
   not a design recommendation — a good reason the exact endpoints aren't
   published here.
+
+Once inside QuantConnect, the signal is combined with **live market data**
+(current quotes, available cash, existing positions) to decide on and manage
+a real trade:
+
+- **Market data ingestion & portfolio sizing** — the algorithm ingests live
+  market data and combines it with the incoming signal to size the trade
+  against the rest of the portfolio.
+- **Order emission** — a live order is submitted to the broker.
+- **Order management** — the algorithm tracks the resting order and any
+  resulting position, handling fills, rejections, and retries.
+- **Position exit** — positions are automatically exited after a fixed
+  30-day hold.
+
+Exact sizing logic and the many execution-edge-case fixes that came from
+running this live are internal to the trading system's own codebase and
+aren't covered here.
 
 ## A separate positions/portfolio service
 
