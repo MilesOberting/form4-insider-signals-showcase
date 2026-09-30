@@ -5,6 +5,15 @@ independently computed from the service's own public signal history — not a
 backtest projection.** See [methodology.md](methodology.md) for how that
 differs from the offline research numbers.
 
+**What this measures, precisely:** the raw signal itself, not any real
+trading account. It's "take every emitted signal, weight them equally, hold
+each for exactly 30 days, don't compound." The trading system that actually
+acts on this feed does more than that — real position sizing, compounding,
+and (per [architecture.md](architecture.md)) an entirely separate second
+strategy unrelated to Form 4 signals — so a real account's overall
+performance is expected to diverge from this number, in either direction. This
+page is a measure of signal quality, not a substitute for account P&L.
+
 ## Summary
 
 | Metric | Value |
@@ -52,8 +61,8 @@ beating a rising benchmark's raw beta exposure over any given stretch.
 
 ## Limitations
 
-- **Short live history.** ~7.5 months and 559 scored signals is enough to see
-  a real, positive per-trade edge, but not enough to rule out a lucky stretch.
+- **Short live history.** ~7 months and 569 scored signals is enough to see a
+  real, positive per-trade edge, but not enough to rule out a lucky stretch.
 - **Signal-definition changes.** The live service's exact signal-emission
   logic changed more than once during this window (see
   [architecture.md](architecture.md)); early signals in this history don't

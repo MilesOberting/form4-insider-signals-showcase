@@ -19,10 +19,18 @@ mean per-signal return of **+3.5%** vs. IWM's **+0.9%** over the same windows
 projection. See [`docs/performance.md`](docs/performance.md) for the full
 writeup, methodology, and limitations.
 
+**Scope note:** this measures the raw signal itself — take every emitted
+signal, equal-weighted, hold 30 days, don't compound. It is not a
+reconstruction of any real trading account, which would also involve
+position sizing, compounding, and (in this case) an entirely separate
+strategy this repo doesn't cover at all. It's a measure of signal quality,
+not account P&L.
+
 ## Read more
 
 - [**Architecture**](docs/architecture.md) — how filings are ingested, parsed,
-  and filtered into a live signal, and the deployment shape of the service.
+  and filtered into a live signal, the deployment shape of the service, and
+  how the signal reaches the downstream trading system.
 - [**Methodology**](docs/methodology.md) — the research/training pipeline
   behind the live rule: data, feature engineering, model, backtesting, and a
   research-integrity note about a bug that was caught and fixed.
@@ -35,17 +43,30 @@ writeup, methodology, and limitations.
   these are the tuned, proprietary part of the strategy.
 - Raw signal logs or transaction-level data — only aggregated, derived
   results are published (see [`analysis/summary_stats.csv`](analysis/summary_stats.csv)).
-- The order-execution/trading system that consumes these signals — this repo
-  covers signal generation and research only.
+- The trading system's own logic (position sizing, order execution, exits) or
+  its unrelated second strategy — only how it *receives* signals is described,
+  generally, in [architecture.md](docs/architecture.md).
+- Any live service endpoints/URLs — the transport mechanism is described,
+  but the actual addresses are withheld since those endpoints currently have
+  no authentication layer.
 
 ## Repo contents
 
 ```
 docs/                    architecture, methodology, and performance write-ups
 assets/performance_chart.png   live-signal vs. IWM cumulative performance chart
-analysis/compute_performance.py   re-runnable script that produces the above from
-                                    the live service's public signal feed
+analysis/compute_performance.py   re-runnable script that produces the above
 analysis/summary_stats.csv        the aggregated output of that script
+```
+
+`compute_performance.py` doesn't hardcode the live service's real endpoint
+(see the note above on withheld URLs). Point it at a signal-log CSV yourself
+to reproduce the analysis:
+
+```bash
+python3 analysis/compute_performance.py --signal-log-url <your-signal-log-url>
+# or, against a local file:
+python3 analysis/compute_performance.py --signal-log-file path/to/signal_log.csv
 ```
 
 ## License

@@ -25,7 +25,6 @@ import yfinance as yf
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
-DEFAULT_SIGNAL_LOG_URL = "https://qtester-production.up.railway.app/signal_log.csv"
 BENCHMARK_TICKER = "IWM"
 FORWARD_DAYS = 30
 COLUMNS_4 = ["timestamp", "ticker", "action", "model"]
@@ -222,11 +221,19 @@ def build_chart(scored: pd.DataFrame, iwm: pd.Series, out_path: str, burn_in: in
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--signal-log-url", default=DEFAULT_SIGNAL_LOG_URL)
+    parser.add_argument(
+        "--signal-log-url",
+        default=None,
+        help="URL of the live service's signal_log.csv endpoint (no default - "
+        "this repo doesn't publish the real one; see architecture.md)",
+    )
     parser.add_argument("--signal-log-file", default=None, help="local CSV override, skips the network fetch")
     parser.add_argument("--out-stats", default="analysis/summary_stats.csv")
     parser.add_argument("--out-chart", default="assets/performance_chart.png")
     args = parser.parse_args()
+
+    if not args.signal_log_url and not args.signal_log_file:
+        parser.error("pass --signal-log-url or --signal-log-file")
 
     df = load_signal_log(args.signal_log_url if not args.signal_log_file else None, args.signal_log_file)
     as_of = pd.Timestamp.now().normalize()
