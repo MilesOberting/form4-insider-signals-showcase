@@ -172,46 +172,39 @@ def summarize(scored: pd.DataFrame) -> pd.DataFrame:
     return pd.concat([pd.DataFrame([overall]), monthly_summary], ignore_index=True)
 
 
-def build_chart(scored: pd.DataFrame, iwm: pd.Series, out_path: str, burn_in: int = 10) -> None:
+def build_chart(scored: pd.DataFrame, out_path: str, burn_in: int = 10) -> None:
     """
-    Two lines, both indexed to 100 at the entry date of the first plotted
-    signal, and both ending at the entry date of the LAST plotted signal:
-      - "Live signals (equal-weight, non-compounding)": the expanding mean of
-        each signal's own realized 30d return, applied to a 100-start index.
-        This assumes equal capital per signal and does not compound trade to
-        trade - it tracks average signal performance over time, not a
-        simulated brokerage account.
-      - IWM buy-and-hold over the identical calendar span.
+    Two lines, both built with the EXACT same method - an expanding mean of
+    matched 30-day returns, equal-weighted, non-compounding, indexed to
+    100 = 0% average return - so the only difference between them is which
+    asset was "bought":
+      - "Live signals": each signal's own realized 30d return.
+      - "IWM at the same entry dates": IWM's OWN 30d return starting from
+        that same signal's entry date, i.e. "what if every one of these
+        trades had bought IWM instead, at the same time, for the same 30
+        days." This is a matched-timing comparison, not IWM buy-and-hold -
+        buy-and-hold would mix in market-timing luck from choosing when to
+        start holding, which isn't what either line is trying to show.
 
-    The first `burn_in` scored signals are used to seed the expanding mean
-    but excluded from the plot itself: an average over only 1-2 samples is
+    Both lines are computed from the FULL expanding mean (starting at signal
+    #1) and only SLICED for display at `burn_in`, not independently rebased
+    to 100 at that point - rebasing each line separately would erase the real
+    gap between them at the point the chart starts, which is exactly the
+    thing this chart exists to show. The first `burn_in` signals are still
+    excluded from the plot itself: an average over only 1-2 samples is
     dominated by whichever trade happened to come first, producing a sharp,
-    meaningless spike/dip at the very start of the line. Full-sample stats
-    in summary_stats.csv are unaffected by this - it only trims the chart.
-
-    The IWM line is clipped to the same end date as the signal line. `scored`
-    only contains signals whose 30-day window has already fully elapsed, so
-    the signal line necessarily stops about a month before today; letting the
-    IWM line run all the way to today would show the benchmark continuing
-    through a stretch that has no corresponding scored signal to compare it
-    against, which reads as the chart extending past the period it's actually
-    describing.
+    meaningless spike/dip. Full-sample stats in summary_stats.csv are
+    unaffected by this - it only trims the chart.
     """
     ordered = scored.sort_values("entry_date").reset_index(drop=True)
-    ordered["cum_avg_return"] = ordered["return_30d"].expanding().mean()
-    plotted = ordered.iloc[burn_in:].copy()
-    rebase = 1 + plotted["cum_avg_return"].iloc[0]
-    signal_index = 100 * (1 + plotted["cum_avg_return"]) / rebase
-
-    start_date = plotted["entry_date"].iloc[0]
-    end_date = plotted["entry_date"].iloc[-1]
-    iwm_window = iwm[(iwm.index >= start_date) & (iwm.index <= end_date)]
-    iwm_index = 100 * (iwm_window / iwm_window.iloc[0])
+    ordered["signal_index"] = 100 * (1 + ordered["return_30d"].expanding().mean())
+    ordered["iwm_index"] = 100 * (1 + ordered["iwm_return_30d"].expanding().mean())
+    plotted = ordered.iloc[burn_in:]
 
     fig, ax = plt.subplots(figsize=(9, 5))
-    ax.plot(plotted["entry_date"], signal_index, label="Live signals (equal-weight, non-compounding)", linewidth=2)
-    ax.plot(iwm_index.index, iwm_index.values, label="IWM buy-and-hold", linewidth=2)
-    ax.set_title("Live Form 4 Signal Performance vs. Russell 2000 (IWM)")
+    ax.plot(plotted["entry_date"], plotted["signal_index"], label="Live signals (equal-weight, non-compounding)", linewidth=2)
+    ax.plot(plotted["entry_date"], plotted["iwm_index"], label="IWM at the same entry dates", linewidth=2)
+    ax.set_title("Live Form 4 Signal Performance vs. IWM, Matched by Entry Date")
     ax.set_ylabel("Index (100 = start)")
     ax.legend()
     ax.grid(alpha=0.3)
@@ -252,7 +245,7 @@ def main():
     summary.to_csv(args.out_stats, index=False)
     print(f"Wrote {args.out_stats}")
 
-    build_chart(scored, iwm_hist, args.out_chart)
+    build_chart(scored, args.out_chart)
     print(f"Wrote {args.out_chart}")
 
 

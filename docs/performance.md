@@ -40,24 +40,19 @@ absolute return.
 
 ![Live signals vs IWM](../assets/performance_chart.png)
 
-Two lines, both indexed to 100 and both ending on the same date:
-- **Live signals** — the expanding average return across every scored signal
-  to date, equal-weighted and non-compounding. This tracks *average signal
-  quality over time*, not a simulated brokerage account.
-- **IWM buy-and-hold** — simply holding the Russell 2000 ETF over the
-  identical calendar span.
+Two lines, built with the exact same method so they're directly comparable —
+an expanding average of matched 30-day returns, equal-weighted and
+non-compounding — differing only in which asset was "bought":
+- **Live signals** — each signal's own realized 30-day return.
+- **IWM at the same entry dates** — IWM's own 30-day return starting from
+  that same signal's entry date. This is deliberately *not* IWM buy-and-hold:
+  buying once and holding for the whole period mixes in market-timing luck
+  from whenever that single start date happened to be, which isn't a fair
+  comparison to a strategy that "buys" 569 different times.
 
-The chart intentionally stops about a month before today: any signal from the
-last 30 days doesn't have a resolved 30-day return yet, so it isn't part of
-the scored comparison, and extending the benchmark line past that point would
-show it running through a stretch with no corresponding signal data to
-compare it against.
-
-Because the Russell 2000 held a strong rally for much of the summer, IWM's
-buy-and-hold line pulled ahead of the signal-quality line in cumulative terms
-even though the per-trade win rate and alpha stayed positive throughout — a
-reminder that a positive per-trade edge doesn't automatically translate into
-beating a rising benchmark's raw beta exposure over any given stretch.
+The chart intentionally stops about a month before today, since any signal
+from the last 30 days doesn't have a resolved return yet to include in either
+line.
 
 ## Limitations
 
