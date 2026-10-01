@@ -92,6 +92,9 @@ limitations.
   research-integrity note about a bug that was caught and fixed.
 - [**Performance**](docs/performance.md) — the full live performance
   write-up vs. the Russell 2000, with a chart and stated limitations.
+- [**Research Challenges**](docs/challenges.md) — overfitting guards, a
+  recurring feature-leakage pattern, and what 16 position-sizing schemes
+  taught us before landing on a live approach.
 
 ## What this repo does NOT include
 

@@ -106,7 +106,9 @@ before a cutoff date trains the model, everything after validates it — rather
 than a random or k-fold split, specifically to avoid letting the model learn
 from the future. An expanding-window walk-forward check is layered on top,
 along with an explicit overfitting guard that flags any case where validation
-performance falls well short of training performance.
+performance falls well short of training performance (see
+[challenges.md](challenges.md) for why that guard only warns, never
+auto-rejects).
 
 ## Backtesting
 
@@ -133,6 +135,10 @@ kind of insider-purchase filtering are modest: a majority-but-not-overwhelming
 win rate and a single-digit percentage average return per trade — not the
 dramatically higher figures the leaked version had produced. That's a more
 honest number to build on, even though it's a less exciting headline.
+
+This turned out to be one instance of a recurring mistake, not a one-off —
+see [challenges.md](challenges.md) for the fuller pattern across other
+features, plus the position-sizing research that happened alongside it.
 
 For real, computed live results (not backtest projections), see
 [performance.md](performance.md).
